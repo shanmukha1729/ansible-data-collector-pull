@@ -1,0 +1,15 @@
+---
+data_dir: /var/lib/node-telemetry
+history_dir: /var/lib/node-telemetry/history
+db_path: /var/lib/node-telemetry/metrics.db
+project_tag: node-data-pipeline
+environment_name: lab
+ansible_pull_repo: https://github.com/shanmukha1729/ansible-data-collector-pull.git
+collector_packages:
+  - jq
+  - sqlite3
+  - curl
+custom_labels:
+  owner: platform-team
+  tier: worker
+  purpose: telemetry-capture
