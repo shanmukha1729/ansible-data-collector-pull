@@ -1,0 +1,74 @@
+---
+- name: Collect node data and store in JSON and SQLite
+  hosts: localhost
+  connection: local
+  become: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: Install required data tools
+      ansible.builtin.package:
+        name: "{{ collector_packages }}"
+        state: latest
+
+    - name: Create data and history directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ data_dir }}"
+        - "{{ history_dir }}"
+
+    - name: Write latest structured JSON snapshot
+      ansible.builtin.template:
+        src: templates/snapshot.json.j2
+        dest: "{{ data_dir }}/snapshot.json"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Save timestamped JSON snapshot into history store
+      ansible.builtin.copy:
+        src: "{{ data_dir }}/snapshot.json"
+        dest: "{{ history_dir }}/snapshot-{{ ansible_facts['date_time']['date'] }}-{{ ansible_facts['date_time']['hour'] }}{{ ansible_facts['date_time']['minute'] }}{{ ansible_facts['date_time']['second'] }}.json"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Initialize SQLite database and snapshots table
+      ansible.builtin.shell: |
+        sqlite3 "{{ db_path }}" <<'SQL'
+        CREATE TABLE IF NOT EXISTS node_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          recorded_at TEXT NOT NULL,
+          hostname TEXT NOT NULL,
+          os_version TEXT NOT NULL,
+          cpu_vcpus INTEGER NOT NULL,
+          memory_total_mb INTEGER NOT NULL,
+          environment TEXT NOT NULL,
+          owner_label TEXT NOT NULL
+        );
+        SQL
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Insert collected node record into SQLite store
+      ansible.builtin.shell: |
+        sqlite3 "{{ db_path }}" "INSERT INTO node_snapshots (recorded_at, hostname, os_version, cpu_vcpus, memory_total_mb, environment, owner_label) VALUES ('{{ ansible_facts['date_time']['iso8601'] }}', '{{ ansible_facts['hostname'] }}', '{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}', {{ ansible_facts['processor_vcpus'] | default(1) }}, {{ ansible_facts['memtotal_mb'] | default(0) }}, '{{ environment_name }}', '{{ custom_labels.owner }}');"
+      args:
+        executable: /bin/bash
+
+    - name: Schedule automatic ansible-pull every 15 minutes
+      ansible.builtin.cron:
+        name: ansible-pull data collector sync
+        user: root
+        minute: "*/15"
+        job: "ansible-pull -o -U {{ ansible_pull_repo }} >> /var/log/ansible-pull.log 2>&1"
+        cron_file: ansible-pull-data-collector
