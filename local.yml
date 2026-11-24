@@ -59,7 +59,13 @@
         executable: /bin/bash
       changed_when: false
 
-      - name: Copy telemetry web form script
+    - name: Insert collected node record into SQLite store
+      ansible.builtin.shell: |
+        sqlite3 "{{ db_path }}" "INSERT INTO node_snapshots (recorded_at, hostname, os_version, cpu_vcpus, memory_total_mb, environment, owner_label) VALUES ('{{ ansible_facts['date_time']['iso8601'] }}', '{{ ansible_facts['hostname'] }}', '{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}', {{ ansible_facts['processor_vcpus'] | default(1) }}, {{ ansible_facts['memtotal_mb'] | default(0) }}, '{{ environment_name }}', '{{ custom_labels.owner }}');"
+      args:
+        executable: /bin/bash
+
+    - name: Copy telemetry web form script
       ansible.builtin.copy:
         src: files/telemetry_form.py
         dest: /usr/local/bin/telemetry_form.py
@@ -92,12 +98,6 @@
         state: started
         enabled: true
         daemon_reload: true
-
-    - name: Insert collected node record into SQLite store
-      ansible.builtin.shell: |
-        sqlite3 "{{ db_path }}" "INSERT INTO node_snapshots (recorded_at, hostname, os_version, cpu_vcpus, memory_total_mb, environment, owner_label) VALUES ('{{ ansible_facts['date_time']['iso8601'] }}', '{{ ansible_facts['hostname'] }}', '{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}', {{ ansible_facts['processor_vcpus'] | default(1) }}, {{ ansible_facts['memtotal_mb'] | default(0) }}, '{{ environment_name }}', '{{ custom_labels.owner }}');"
-      args:
-        executable: /bin/bash
 
     - name: Schedule automatic ansible-pull every 15 minutes
       ansible.builtin.cron:
