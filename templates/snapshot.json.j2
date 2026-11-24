@@ -1,0 +1,19 @@
+{
+  "project": "{{ project_tag }}",
+  "environment": "{{ environment_name }}",
+  "collected_at_utc": "{{ ansible_facts['date_time']['iso8601'] }}",
+  "node": {
+    "hostname": "{{ ansible_facts['hostname'] }}",
+    "fqdn": "{{ ansible_facts['fqdn'] }}",
+    "os": "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}",
+    "kernel": "{{ ansible_facts['kernel'] }}",
+    "architecture": "{{ ansible_facts['architecture'] }}",
+    "cpu_vcpus": {{ ansible_facts['processor_vcpus'] | default(1) }},
+    "memory_total_mb": {{ ansible_facts['memtotal_mb'] | default(0) }}
+  },
+  "labels": {
+    "owner": "{{ custom_labels.owner }}",
+    "tier": "{{ custom_labels.tier }}",
+    "purpose": "{{ custom_labels.purpose }}"
+  }
+}
